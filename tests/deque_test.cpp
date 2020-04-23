@@ -18,14 +18,14 @@ TEST_CASE("basic operations", "[deque]") {
 
   // Single push, pop.
   worker.push(100);
-  REQUIRE(*worker.pop() == 100);
+  REQUIRE(worker.pop() == 100);
 
   // Steal when empty.
   REQUIRE(!stealer.steal());
 
   // Single push, steal.
   worker.push(100);
-  REQUIRE(*stealer.steal() == 100);
+  REQUIRE(stealer.steal() == 100);
 }
 
 TEST_CASE("multiple steals on deque of length 1", "[deque]") {
@@ -38,6 +38,7 @@ TEST_CASE("multiple steals on deque of length 1", "[deque]") {
   std::atomic<int> seen(0);
   std::vector<std::thread> stealers;
 
+  stealers.reserve(nthreads);
   for (int i = 0; i < nthreads; ++i) {
     stealers.emplace_back([&stealer, &seen]() {
       auto clone = stealer;
@@ -63,6 +64,7 @@ TEST_CASE("push against steals", "[deque]") {
   std::vector<std::thread> threads;
   std::atomic<int> remaining(max);
 
+  threads.reserve(nthreads);
   for (auto i = 0; i < nthreads; ++i) {
     threads.emplace_back([&stealer, &remaining]() {
       auto clone = stealer;
@@ -70,7 +72,7 @@ TEST_CASE("push against steals", "[deque]") {
         auto x = clone.steal();
         if (x) {
           // Can't use REQUIRE here because it isn't thread-safe.
-          assert(*x == 1);
+          assert(x == 1);
           remaining.fetch_sub(1);
         }
       }
@@ -88,8 +90,12 @@ TEST_CASE("push against steals", "[deque]") {
 
 // Dummy work struct.
 struct work {
-  int label;
+  int label{-1};
   std::string path;
+
+  explicit operator bool() const {
+    return label != -1;
+  }
 };
 
 TEST_CASE("pop and steal", "[deque]") {
@@ -105,6 +111,7 @@ TEST_CASE("pop and steal", "[deque]") {
   for (auto i = 0; i < max; ++i)
     worker.push(work{1, "/some/random/path"});
 
+  threads.reserve(nthreads);
   for (auto i = 0; i < nthreads; ++i) {
     threads.emplace_back([&stealer, &remaining]() {
       auto clone = stealer;
@@ -112,7 +119,7 @@ TEST_CASE("pop and steal", "[deque]") {
         auto x = clone.steal();
         if (x) {
           // Can't use REQUIRE here because it isn't thread-safe.
-          assert((*x).label == 1);
+          assert(x.label == 1);
           remaining.fetch_sub(1);
         }
       }
@@ -122,7 +129,7 @@ TEST_CASE("pop and steal", "[deque]") {
   while (remaining.load(std::memory_order_seq_cst) > 0) {
     auto x = worker.pop();
     if (x) {
-      assert((*x).label == 1);
+      assert(x.label == 1);
       remaining.fetch_sub(1);
     }
   }

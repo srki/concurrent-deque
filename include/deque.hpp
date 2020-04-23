@@ -2,7 +2,6 @@
 #define DEQUE_HPP
 
 #include <atomic>
-#include <experimental/optional>
 #include <memory>
 
 namespace deque {
@@ -154,7 +153,7 @@ public:
     bottom.store(b + 1, std::memory_order_relaxed);
   }
 
-  std::experimental::optional<T> pop_bottom() {
+  T pop_bottom() {
     auto b = bottom.load(std::memory_order_relaxed);
     auto a = buffer.load(std::memory_order_acquire);
 
@@ -163,7 +162,7 @@ public:
     auto t = top.load(std::memory_order_relaxed);
 
     auto size = b - t;
-    std::experimental::optional<T> popped = {};
+    T popped{};
 
     if (size <= 0) {
       // Deque empty: reverse the decrement to bottom.
@@ -190,13 +189,13 @@ public:
     return popped;
   }
 
-  std::experimental::optional<T> steal() {
+  T steal() {
     auto t = top.load(std::memory_order_acquire);
     std::atomic_thread_fence(std::memory_order_seq_cst);
     auto b = bottom.load(std::memory_order_acquire);
 
     int size = b - t;
-    std::experimental::optional<T> stolen = {};
+    T stolen{};
 
     if (size > 0) {
       auto a = buffer.load(std::memory_order_consume);
@@ -262,7 +261,7 @@ public:
     deque->push_bottom(item);
   }
 
-  std::experimental::optional<T> pop() {
+  T pop() {
     return deque->pop_bottom();
   }
 };
@@ -299,7 +298,7 @@ public:
   ~Stealer() {
   }
 
-  std::experimental::optional<T> steal() {
+  T steal() {
     // We use memory_order_release to synchronize with the read by the
     // reclaimer. It makes sense, but I'm not absolutely sure about
     // this.
